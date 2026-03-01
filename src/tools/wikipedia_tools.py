@@ -157,7 +157,8 @@ class WikipediaTool(BaseTool):
         return await self.execute_with_monitoring(
             "search_educational_articles",
             _search,
-            user_session=user_session
+            user_session=user_session,
+            cache_params={"query": query, "subject": subject, "grade_level": grade_level, "language": language, "limit": limit}
         )
     
     async def get_article_summary(
@@ -202,7 +203,8 @@ class WikipediaTool(BaseTool):
         return await self.execute_with_monitoring(
             "get_article_summary",
             _get_summary,
-            user_session=user_session
+            user_session=user_session,
+            cache_params={"title": title, "language": language}
         )
     
     async def get_article_content(
@@ -254,7 +256,8 @@ class WikipediaTool(BaseTool):
         return await self.execute_with_monitoring(
             "get_article_content",
             _get_content,
-            user_session=user_session
+            user_session=user_session,
+            cache_params={"title": title, "language": language, "include_images": include_images}
         )
     
     async def get_featured_article(
@@ -302,7 +305,8 @@ class WikipediaTool(BaseTool):
         return await self.execute_with_monitoring(
             "get_featured_article",
             _get_featured,
-            user_session=user_session
+            user_session=user_session,
+            cache_params={"date_param": date_param, "language": language}
         )
     
     async def get_articles_by_subject(
@@ -381,7 +385,8 @@ class WikipediaTool(BaseTool):
         return await self.execute_with_monitoring(
             "get_articles_by_subject",
             _search_by_subject,
-            user_session=user_session
+            user_session=user_session,
+            cache_params={"subject": subject, "grade_level": grade_level, "language": language, "limit": limit}
         )
     
     async def _enrich_educational_metadata(

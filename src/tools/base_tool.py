@@ -55,21 +55,23 @@ class BaseTool(ABC):
         method_func,
         *args,
         user_session: Optional[str] = None,
+        cache_params: Optional[Dict[str, Any]] = None,
         **kwargs
     ) -> Any:
         """
         Execute a tool method with monitoring, caching, and error handling.
-        
+
         Args:
             method_name: Name of the method being executed
             method_func: The method function to execute
             *args: Positional arguments for the method
             user_session: User session identifier
+            cache_params: Dict of tool-specific parameters for cache key generation
             **kwargs: Keyword arguments for the method
-            
+
         Returns:
             Method result
-            
+
         Raises:
             ToolError: If tool execution fails
         """
@@ -78,10 +80,10 @@ class BaseTool(ABC):
         error_occurred = False
         result = None
         result_count = None
-        
+
         try:
             # Generate cache key
-            cache_key = self._generate_cache_key(method_name, *args, **kwargs)
+            cache_key = self._generate_cache_key(method_name, cache_params=cache_params)
             
             # Try to get from cache first
             if cache_key:
@@ -163,47 +165,24 @@ class BaseTool(ABC):
         
         return result
     
-    def _generate_cache_key(self, method_name: str, *args, **kwargs) -> Optional[str]:
-        """
-        Generate a cache key for the method call.
-        
-        Args:
-            method_name: Name of the method
-            *args: Positional arguments
-            **kwargs: Keyword arguments
-            
-        Returns:
-            Cache key string or None if caching should be disabled
-        """
+    def _generate_cache_key(self, method_name: str, cache_params: Optional[Dict[str, Any]] = None) -> Optional[str]:
+        """Generate a cache key from method name and explicit parameters."""
         try:
-            # Create a deterministic key from method name and parameters
             key_parts = [self.tool_name, method_name]
-            
-            # Add positional arguments
-            for arg in args:
-                if isinstance(arg, (str, int, float, bool)):
-                    key_parts.append(str(arg))
-                else:
-                    # For complex objects, use their string representation
-                    key_parts.append(str(hash(str(arg))))
-            
-            # Add keyword arguments (sorted for consistency)
-            for key, value in sorted(kwargs.items()):
-                if isinstance(value, (str, int, float, bool, type(None))):
-                    key_parts.append(f"{key}:{value}")
-                else:
-                    key_parts.append(f"{key}:{hash(str(value))}")
-            
-            # Join with separator and hash if too long
+
+            if cache_params:
+                for key, value in sorted(cache_params.items()):
+                    if value is not None:
+                        key_parts.append(f"{key}:{value}")
+
             cache_key = "|".join(key_parts)
-            
-            # Limit key length
+
             if len(cache_key) > 250:
                 import hashlib
                 cache_key = f"{self.tool_name}:{method_name}:{hashlib.md5(cache_key.encode()).hexdigest()}"
-            
+
             return cache_key
-            
+
         except Exception as e:
             logger.warning(f"Failed to generate cache key: {e}")
             return None

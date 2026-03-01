@@ -133,7 +133,8 @@ class OpenLibraryTool(BaseTool):
         return await self.execute_with_monitoring(
             "search_educational_books",
             _search,
-            user_session=user_session
+            user_session=user_session,
+            cache_params={"query": query, "subject": subject, "grade_level": grade_level, "limit": limit}
         )
     
     async def get_book_details_by_isbn(
@@ -188,7 +189,8 @@ class OpenLibraryTool(BaseTool):
         return await self.execute_with_monitoring(
             "get_book_details_by_isbn",
             _get_details,
-            user_session=user_session
+            user_session=user_session,
+            cache_params={"isbn": isbn}
         )
     
     async def search_books_by_subject(
@@ -258,7 +260,8 @@ class OpenLibraryTool(BaseTool):
         return await self.execute_with_monitoring(
             "search_books_by_subject",
             _search_by_subject,
-            user_session=user_session
+            user_session=user_session,
+            cache_params={"subject": subject, "grade_level": grade_level, "limit": limit}
         )
     
     async def get_book_recommendations(
@@ -335,7 +338,8 @@ class OpenLibraryTool(BaseTool):
         return await self.execute_with_monitoring(
             "get_book_recommendations",
             _get_recommendations,
-            user_session=user_session
+            user_session=user_session,
+            cache_params={"grade_level": grade_level, "subject": subject, "limit": limit}
         )
     
     async def _enrich_educational_metadata(

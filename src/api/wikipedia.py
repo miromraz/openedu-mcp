@@ -9,6 +9,7 @@ with proper error handling and rate limiting.
 import asyncio
 import logging
 import re
+import ssl
 from typing import Dict, Any, List, Optional, Union
 from urllib.parse import quote_plus, urljoin
 import aiohttp
@@ -53,9 +54,12 @@ class WikipediaClient:
         """Get or create HTTP session."""
         if self._session is None or self._session.closed:
             timeout = aiohttp.ClientTimeout(total=self.timeout)
+            ssl_ctx = ssl.create_default_context()
+            connector = aiohttp.TCPConnector(ssl=ssl_ctx)
             self._session = aiohttp.ClientSession(
                 headers=self.headers,
-                timeout=timeout
+                timeout=timeout,
+                connector=connector,
             )
         return self._session
     

@@ -63,8 +63,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+@contextlib.asynccontextmanager
+async def app_lifespan(server):
+    """Initialize services on startup, clean up on shutdown."""
+    await initialize_services()
+    try:
+        yield
+    finally:
+        await cleanup_services()
+
 # Create FastMCP server instance
-mcp = FastMCP("openedu-mcp-server")
+mcp = FastMCP("openedu-mcp-server", lifespan=app_lifespan)
 
 # Global services
 cache_service: Optional[CacheService] = None
@@ -853,7 +862,7 @@ async def sse_event_generator(request: Request):
     finally:
         logger.info("SSE event generator finished.")
 
-@mcp.tool(route="/events", methods=["GET"]) # Assuming a route decorator might exist or be added to FastMCP
+# Removed: @mcp.tool() — stream_events is not a valid MCP tool
 async def stream_events(request: Request) -> StreamingResponse:
     """
     SSE endpoint to stream events.
@@ -960,18 +969,8 @@ async def cleanup_services() -> None:
 def main():
     """Main entry point for the OpenEdu MCP Server."""
     try:
-        # Initialize services
-        asyncio.run(initialize_services())
-        
-        # Set up cleanup on exit
-        import atexit
-        atexit.register(lambda: asyncio.run(cleanup_services()))
-        
         logger.info("Starting OpenEdu MCP Server...")
-        
-        # Run the MCP server
         mcp.run()
-        
     except KeyboardInterrupt:
         logger.info("Server shutdown requested")
     except Exception as e:
