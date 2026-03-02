@@ -147,13 +147,17 @@ class WikipediaTool(BaseTool):
                 grade_level=validated.get('grade_level'),
                 subject=subject
             )
-            
+
+            # Fallback: if filters removed everything, return unfiltered results
+            if not filtered_articles and articles:
+                filtered_articles = articles
+
             # Sort by educational relevance
             sorted_articles = self.sort_by_educational_relevance(filtered_articles)
-            
+
             # Convert to dictionaries for response
             return [article.to_dict() for article in sorted_articles]
-        
+
         return await self.execute_with_monitoring(
             "search_educational_articles",
             _search,
@@ -376,12 +380,16 @@ class WikipediaTool(BaseTool):
                 grade_level=validated.get('grade_level'),
                 subject=subject
             )
-            
+
+            # Fallback: if filters removed everything, return unfiltered results
+            if not filtered_articles and articles:
+                filtered_articles = articles
+
             # Sort by educational relevance
             sorted_articles = self.sort_by_educational_relevance(filtered_articles)
-            
+
             return [article.to_dict() for article in sorted_articles]
-        
+
         return await self.execute_with_monitoring(
             "get_articles_by_subject",
             _search_by_subject,

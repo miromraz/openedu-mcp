@@ -73,7 +73,8 @@ class WikipediaClient:
         url: str,
         params: Optional[Dict[str, Any]] = None,
         retry_count: int = 0,
-        use_action_api: bool = False
+        use_action_api: bool = False,
+        lang: str = 'en'
     ) -> Dict[str, Any]:
         """
         Make HTTP request with retry logic and error handling.
@@ -91,7 +92,7 @@ class WikipediaClient:
             APIError: If request fails after all retries
         """
         if not url.startswith('http'):
-            base = self.action_api_url if use_action_api else self.base_url
+            base = f"https://{lang}.wikipedia.org/w/api.php" if use_action_api else self.base_url
             url = urljoin(base, url)
         
         session = await self._get_session()
@@ -206,7 +207,7 @@ class WikipediaClient:
         
         try:
             # Use action API for search
-            response = await self._make_request('', params, use_action_api=True)
+            response = await self._make_request('', params, use_action_api=True, lang=lang)
             
             if 'query' not in response or 'search' not in response['query']:
                 return []
@@ -290,17 +291,17 @@ class WikipediaClient:
                 'utf8': 1
             }
             
-            response = await self._make_request('', params, use_action_api=True)
-            
+            response = await self._make_request('', params, use_action_api=True, lang=lang)
+
             if 'query' not in response or 'pages' not in response['query']:
                 return {}
-            
+
             pages = response['query']['pages']
             page_data = next(iter(pages.values()))
-            
+
             if 'missing' in page_data:
                 return {}
-            
+
             return {
                 'title': page_data.get('title', title),
                 'extract': page_data.get('extract', ''),
@@ -349,17 +350,17 @@ class WikipediaClient:
                 'utf8': 1
             }
             
-            response = await self._make_request('', params, use_action_api=True)
-            
+            response = await self._make_request('', params, use_action_api=True, lang=lang)
+
             if 'query' not in response or 'pages' not in response['query']:
                 return {}
-            
+
             pages = response['query']['pages']
             page_data = next(iter(pages.values()))
-            
+
             if 'missing' in page_data:
                 return {}
-            
+
             # Extract links and images
             links = []
             if 'links' in page_data:
@@ -478,21 +479,21 @@ class WikipediaClient:
                 'utf8': 1
             }
             
-            response = await self._make_request('', params, use_action_api=True)
-            
+            response = await self._make_request('', params, use_action_api=True, lang=lang)
+
             if 'query' not in response or 'pages' not in response['query']:
                 return []
-            
+
             pages = response['query']['pages']
             page_data = next(iter(pages.values()))
-            
+
             if 'missing' in page_data or 'images' not in page_data:
                 return []
-            
+
             images = []
             for img in page_data['images']:
                 img_title = img['title']
-                
+
                 # Get image info
                 try:
                     img_params = {
@@ -503,8 +504,8 @@ class WikipediaClient:
                         'iiprop': 'url|size|mime',
                         'utf8': 1
                     }
-                    
-                    img_response = await self._make_request('', img_params, use_action_api=True)
+
+                    img_response = await self._make_request('', img_params, use_action_api=True, lang=lang)
                     
                     if 'query' in img_response and 'pages' in img_response['query']:
                         img_pages = img_response['query']['pages']
