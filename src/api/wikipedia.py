@@ -25,9 +25,31 @@ from exceptions import APIError, ValidationError
 logger = logging.getLogger(__name__)
 
 
+_LANG_NAME_TO_CODE = {
+    'czech': 'cs', 'english': 'en', 'german': 'de', 'french': 'fr',
+    'spanish': 'es', 'italian': 'it', 'portuguese': 'pt', 'dutch': 'nl',
+    'polish': 'pl', 'russian': 'ru', 'japanese': 'ja', 'chinese': 'zh',
+    'korean': 'ko', 'arabic': 'ar', 'turkish': 'tr', 'swedish': 'sv',
+    'norwegian': 'no', 'danish': 'da', 'finnish': 'fi', 'hungarian': 'hu',
+    'romanian': 'ro', 'ukrainian': 'uk', 'slovak': 'sk', 'slovenian': 'sl',
+    'croatian': 'hr', 'serbian': 'sr', 'bulgarian': 'bg', 'greek': 'el',
+    'hebrew': 'he', 'hindi': 'hi', 'thai': 'th', 'vietnamese': 'vi',
+    'indonesian': 'id', 'malay': 'ms', 'catalan': 'ca', 'basque': 'eu',
+}
+
+
+def _normalize_lang(lang: str) -> str:
+    """Normalize a language name or code to a 2-3 letter ISO 639-1 code."""
+    code = _LANG_NAME_TO_CODE.get(lang.lower(), lang.lower())
+    if not re.match(r'^[a-z]{2,3}$', code):
+        logger.warning(f"Invalid language code '{lang}', falling back to 'en'")
+        return 'en'
+    return code
+
+
 class WikipediaClient:
     """Client for Wikipedia API with educational focus."""
-    
+
     def __init__(self, config: Config):
         """
         Initialize the Wikipedia client.
@@ -91,6 +113,7 @@ class WikipediaClient:
         Raises:
             APIError: If request fails after all retries
         """
+        lang = _normalize_lang(lang)
         if not url.startswith('http'):
             base = f"https://{lang}.wikipedia.org/w/api.php" if use_action_api else self.base_url
             url = urljoin(base, url)
@@ -272,6 +295,7 @@ class WikipediaClient:
         
         try:
             # Try REST API first for summary
+            lang = _normalize_lang(lang)
             rest_url = f"https://{lang}.wikipedia.org/api/rest_v1/page/summary/{quote_plus(normalized_title)}"
             response = await self._make_request(rest_url)
             
@@ -422,6 +446,7 @@ class WikipediaClient:
         
         try:
             # Use REST API for featured content
+            lang = _normalize_lang(lang)
             url = f"https://{lang}.wikipedia.org/api/rest_v1/feed/featured/{date_str}"
             response = await self._make_request(url)
             
