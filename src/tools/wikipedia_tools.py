@@ -237,13 +237,13 @@ class WikipediaTool(BaseTool):
         async def _get_content():
             # Get full article content
             content_data = await self.client.get_article_content(title, language)
-            
+
             if not content_data:
                 raise ToolError(f"Article not found: {title}", self.tool_name)
-            
+
             # Convert to Article model
             article = Article.from_wikipedia(content_data)
-            
+
             # Get images if requested
             if include_images:
                 try:
@@ -251,11 +251,15 @@ class WikipediaTool(BaseTool):
                     article.multimedia_resources = [img['url'] for img in images if img.get('url')]
                 except Exception as e:
                     logger.warning(f"Failed to get images for {title}: {e}")
-            
+
             # Enrich with educational metadata
             article = await self._enrich_educational_metadata(article, language=language)
-            
-            return article.to_dict()
+
+            result = article.to_dict()
+            # Preserve tables extracted from HTML (not part of Article model)
+            if content_data.get('tables'):
+                result['tables'] = content_data['tables']
+            return result
         
         return await self.execute_with_monitoring(
             "get_article_content",

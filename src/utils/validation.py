@@ -55,7 +55,7 @@ class Validator:
             )
         
         # Check for potentially harmful content
-        if re.search(r'[<>"\']', query):
+        if re.search(r'[<>]', query):
             raise ValidationError(
                 "Query contains invalid characters",
                 "query"

@@ -308,8 +308,8 @@ class WikipediaClient:
                 'format': 'json',
                 'titles': title,
                 'prop': 'extracts|info|categories',
-                'exintro': True,
-                'explaintext': True,
+                'exintro': '1',
+                'explaintext': '1',
                 'exsectionformat': 'plain',
                 'inprop': 'url',
                 'utf8': 1
@@ -398,6 +398,13 @@ class WikipediaClient:
             if 'categories' in page_data:
                 categories = [cat['title'].replace('Category:', '') for cat in page_data['categories']]
             
+            # Fetch tables from HTML version (plain text extract strips them)
+            tables = []
+            try:
+                tables = await self._extract_tables(normalized_title, lang)
+            except Exception as e:
+                logger.warning(f"Failed to extract tables for {title}: {e}")
+
             return {
                 'title': page_data.get('title', title),
                 'extract': page_data.get('extract', ''),
@@ -406,12 +413,80 @@ class WikipediaClient:
                 'categories': categories,
                 'links': links[:20],  # Limit to first 20 links
                 'images': images,
-                'wordcount': len(page_data.get('extract', '').split()) if page_data.get('extract') else 0
+                'wordcount': len(page_data.get('extract', '').split()) if page_data.get('extract') else 0,
+                'tables': tables,
             }
-            
+
         except Exception as e:
             logger.error(f"Error getting article content for {title}: {e}")
             raise
+
+    async def _extract_tables(
+        self,
+        title: str,
+        lang: str = 'en',
+        max_tables: int = 5,
+        max_chars_per_table: int = 3000
+    ) -> List[Dict[str, str]]:
+        """Extract tables from a Wikipedia article's HTML and convert to markdown.
+
+        Args:
+            title: Normalized article title (underscores)
+            lang: Language code
+            max_tables: Maximum number of tables to return
+            max_chars_per_table: Truncate each table's markdown to this length
+
+        Returns:
+            List of dicts with 'caption' and 'markdown' keys.
+        """
+        from bs4 import BeautifulSoup
+
+        lang = _normalize_lang(lang)
+        url = f"https://{lang}.wikipedia.org/api/rest_v1/page/html/{quote_plus(title)}"
+        session = await self._get_session()
+
+        async with session.get(url) as resp:
+            if resp.status != 200:
+                return []
+            html = await resp.text()
+
+        soup = BeautifulSoup(html, "html.parser")
+        results = []
+
+        for table_el in soup.find_all("table", class_="wikitable", limit=max_tables):
+            caption = ""
+            cap_el = table_el.find("caption")
+            if cap_el:
+                caption = cap_el.get_text(strip=True)
+
+            rows = table_el.find_all("tr")
+            if not rows:
+                continue
+
+            md_rows = []
+            col_count = 0
+            for tr in rows:
+                cells = tr.find_all(["th", "td"])
+                cell_texts = [c.get_text(separator=" ", strip=True).replace("|", "\\|") for c in cells]
+                if not cell_texts:
+                    continue
+                col_count = max(col_count, len(cell_texts))
+                md_rows.append("| " + " | ".join(cell_texts) + " |")
+
+            if len(md_rows) < 2:
+                continue
+
+            # Insert separator after header row
+            header = md_rows[0]
+            sep = "| " + " | ".join(["-"] * col_count) + " |"
+            md = "\n".join([header, sep] + md_rows[1:])
+
+            if len(md) > max_chars_per_table:
+                md = md[:max_chars_per_table] + "\n... (truncated)"
+
+            results.append({"caption": caption, "markdown": md})
+
+        return results
     
     async def get_daily_featured(
         self,
