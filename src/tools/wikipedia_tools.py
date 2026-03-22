@@ -191,18 +191,29 @@ class WikipediaTool(BaseTool):
         async def _get_summary():
             # Get article summary from Wikipedia
             summary_data = await self.client.get_article_summary(title, language)
-            
+
+            matched_title = None
             if not summary_data:
-                raise ToolError(f"Article not found: {title}", self.tool_name)
-            
+                # Fallback: search for the title instead of failing immediately
+                titles = await self.client.search_titles(title, language, limit=3)
+                if titles:
+                    matched_title = titles[0]
+                    logger.info(f"Article '{title}' not found, falling back to search match: '{matched_title}'")
+                    summary_data = await self.client.get_article_summary(matched_title, language)
+                if not summary_data:
+                    raise ToolError(f"Article not found: {title}", self.tool_name)
+
             # Convert to Article model
             article = Article.from_wikipedia(summary_data)
-            
+
             # Enrich with educational metadata if requested
             if include_educational_analysis:
                 article = await self._enrich_educational_metadata(article, language=language)
-            
-            return article.to_dict()
+
+            result = article.to_dict()
+            if matched_title:
+                result['note'] = f"Exact article '{title}' not found. Showing best match: '{matched_title}'"
+            return result
         
         return await self.execute_with_monitoring(
             "get_article_summary",
@@ -238,19 +249,28 @@ class WikipediaTool(BaseTool):
             # Get full article content
             content_data = await self.client.get_article_content(title, language)
 
+            matched_title = None
             if not content_data:
-                raise ToolError(f"Article not found: {title}", self.tool_name)
+                # Fallback: search for the title instead of failing immediately
+                titles = await self.client.search_titles(title, language, limit=3)
+                if titles:
+                    matched_title = titles[0]
+                    logger.info(f"Article '{title}' not found, falling back to search match: '{matched_title}'")
+                    content_data = await self.client.get_article_content(matched_title, language)
+                if not content_data:
+                    raise ToolError(f"Article not found: {title}", self.tool_name)
 
             # Convert to Article model
             article = Article.from_wikipedia(content_data)
 
             # Get images if requested
             if include_images:
+                img_title = matched_title or title
                 try:
-                    images = await self.client.get_article_images(title, language)
+                    images = await self.client.get_article_images(img_title, language)
                     article.multimedia_resources = [img['url'] for img in images if img.get('url')]
                 except Exception as e:
-                    logger.warning(f"Failed to get images for {title}: {e}")
+                    logger.warning(f"Failed to get images for {img_title}: {e}")
 
             # Enrich with educational metadata
             article = await self._enrich_educational_metadata(article, language=language)
@@ -259,8 +279,10 @@ class WikipediaTool(BaseTool):
             # Preserve tables extracted from HTML (not part of Article model)
             if content_data.get('tables'):
                 result['tables'] = content_data['tables']
+            if matched_title:
+                result['note'] = f"Exact article '{title}' not found. Showing best match: '{matched_title}'"
             return result
-        
+
         return await self.execute_with_monitoring(
             "get_article_content",
             _get_content,

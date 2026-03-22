@@ -272,6 +272,35 @@ class WikipediaClient:
             logger.error(f"Error searching Wikipedia: {e}")
             raise
     
+    async def search_titles(
+        self,
+        query: str,
+        lang: str = 'en',
+        limit: int = 3
+    ) -> List[str]:
+        """Search Wikipedia and return just article titles (no content fetch).
+
+        Useful as a lightweight fallback when an exact title lookup fails.
+        """
+        lang = _normalize_lang(lang)
+        params = {
+            'action': 'query',
+            'format': 'json',
+            'list': 'search',
+            'srsearch': query,
+            'srlimit': limit,
+            'srprop': '',
+            'utf8': 1,
+        }
+        try:
+            response = await self._make_request('', params, use_action_api=True, lang=lang)
+            if 'query' not in response or 'search' not in response['query']:
+                return []
+            return [item['title'] for item in response['query']['search']]
+        except Exception as e:
+            logger.warning(f"Title search failed for '{query}': {e}")
+            return []
+
     async def get_article_summary(
         self,
         title: str,
