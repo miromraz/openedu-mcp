@@ -14,6 +14,7 @@ from datetime import datetime
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config import Config
@@ -29,35 +30,21 @@ logger = logging.getLogger(__name__)
 
 class BaseTool(ABC):
     """Base class for all educational tools."""
-    
-    def __init__(
-        self,
-        config: Config,
-        cache_service: CacheService,
-        rate_limiting_service: RateLimitingService,
-        usage_service: UsageService
-    ):
+
+    def __init__(self, config: Config, cache_service: CacheService, rate_limiting_service: RateLimitingService, usage_service: UsageService):
         self.config = config
         self.cache_service = cache_service
         self.rate_limiting_service = rate_limiting_service
         self.usage_service = usage_service
         self.tool_name = self.__class__.__name__.replace("Tool", "").lower()
-        
+
     @property
     @abstractmethod
     def api_name(self) -> str:
         """Name of the API this tool uses for rate limiting."""
         pass
-    
-    async def execute_with_monitoring(
-        self,
-        method_name: str,
-        method_func,
-        *args,
-        user_session: Optional[str] = None,
-        cache_params: Optional[Dict[str, Any]] = None,
-        **kwargs
-    ) -> Any:
+
+    async def execute_with_monitoring(self, method_name: str, method_func, *args, user_session: Optional[str] = None, cache_params: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
         """
         Execute a tool method with monitoring, caching, and error handling.
 
@@ -84,7 +71,7 @@ class BaseTool(ABC):
         try:
             # Generate cache key
             cache_key = self._generate_cache_key(method_name, cache_params=cache_params)
-            
+
             # Try to get from cache first
             if cache_key:
                 cached_result = await self.cache_service.get(cache_key)
@@ -93,7 +80,7 @@ class BaseTool(ABC):
                     result = cached_result
                     if isinstance(result, list):
                         result_count = len(result)
-                    
+
                     # Record usage
                     execution_time = int((time.time() - start_time) * 1000)
                     await self.usage_service.record_tool_usage(
@@ -104,51 +91,47 @@ class BaseTool(ABC):
                         error_occurred=False,
                         user_session=user_session,
                         parameters=self._sanitize_parameters(kwargs),
-                        result_count=result_count
+                        result_count=result_count,
                     )
-                    
+
                     return result
-            
+
             # Check rate limits
             await self.rate_limiting_service.wait_if_needed(self.api_name)
-            
+
             # Execute the method
             result = await method_func(*args, **kwargs)
-            
+
             # Record the API request
             await self.rate_limiting_service.record_request(self.api_name)
-            
+
             # Cache the result if we have a cache key
             if cache_key and result is not None:
                 await self.cache_service.set(cache_key, result)
-            
+
             # Count results
             if isinstance(result, list):
                 result_count = len(result)
             elif result is not None:
                 result_count = 1
-            
+
         except RateLimitError:
             error_occurred = True
             raise  # Re-raise rate limit errors as-is
-            
+
         except ValidationError:
             error_occurred = True
             raise  # Re-raise validation errors as-is
-            
+
         except APIError:
             error_occurred = True
             raise  # Re-raise API errors as-is
-            
+
         except Exception as e:
             error_occurred = True
             logger.error(f"Error in {self.tool_name}.{method_name}: {e}")
-            raise ToolError(
-                f"Tool execution failed: {str(e)}",
-                self.tool_name,
-                f"Method: {method_name}"
-            )
-            
+            raise ToolError(f"Tool execution failed: {str(e)}", self.tool_name, f"Method: {method_name}")
+
         finally:
             # Record usage statistics
             execution_time = int((time.time() - start_time) * 1000)
@@ -160,11 +143,11 @@ class BaseTool(ABC):
                 error_occurred=error_occurred,
                 user_session=user_session,
                 parameters=self._sanitize_parameters(kwargs),
-                result_count=result_count
+                result_count=result_count,
             )
-        
+
         return result
-    
+
     def _generate_cache_key(self, method_name: str, cache_params: Optional[Dict[str, Any]] = None) -> Optional[str]:
         """Generate a cache key from method name and explicit parameters."""
         try:
@@ -179,6 +162,7 @@ class BaseTool(ABC):
 
             if len(cache_key) > 250:
                 import hashlib
+
                 cache_key = f"{self.tool_name}:{method_name}:{hashlib.md5(cache_key.encode()).hexdigest()}"
 
             return cache_key
@@ -186,20 +170,20 @@ class BaseTool(ABC):
         except Exception as e:
             logger.warning(f"Failed to generate cache key: {e}")
             return None
-    
+
     def _sanitize_parameters(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """
         Sanitize parameters for logging (remove sensitive data).
-        
+
         Args:
             params: Parameters dictionary
-            
+
         Returns:
             Sanitized parameters
         """
         sanitized = {}
-        sensitive_keys = {'password', 'token', 'key', 'secret', 'auth'}
-        
+        sensitive_keys = {"password", "token", "key", "secret", "auth"}
+
         for key, value in params.items():
             if any(sensitive in key.lower() for sensitive in sensitive_keys):
                 sanitized[key] = "[REDACTED]"
@@ -207,147 +191,121 @@ class BaseTool(ABC):
                 sanitized[key] = value
             else:
                 sanitized[key] = str(type(value).__name__)
-        
+
         return sanitized
-    
+
     async def validate_common_parameters(
-        self,
-        query: Optional[str] = None,
-        limit: Optional[int] = None,
-        grade_level: Optional[str] = None,
-        subject: Optional[str] = None,
-        language: Optional[str] = None
+        self, query: Optional[str] = None, limit: Optional[int] = None, grade_level: Optional[str] = None, subject: Optional[str] = None, language: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Validate common parameters used across tools.
-        
+
         Args:
             query: Search query
             limit: Result limit
             grade_level: Educational grade level
             subject: Educational subject
             language: Language code
-            
+
         Returns:
             Dictionary of validated parameters
-            
+
         Raises:
             ValidationError: If any parameter is invalid
         """
         validated = {}
-        
+
         if query is not None:
-            validated['query'] = Validator.validate_query(query)
-        
+            validated["query"] = Validator.validate_query(query)
+
         if limit is not None:
-            validated['limit'] = Validator.validate_limit(limit)
-        
+            validated["limit"] = Validator.validate_limit(limit)
+
         if grade_level is not None:
-            validated['grade_level'] = Validator.validate_grade_level(grade_level)
-        
+            validated["grade_level"] = Validator.validate_grade_level(grade_level)
+
         if subject is not None:
-            validated['subject'] = Validator.validate_subject(subject)
-        
+            validated["subject"] = Validator.validate_subject(subject)
+
         if language is not None:
-            validated['language'] = Validator.validate_language_code(language)
-        
+            validated["language"] = Validator.validate_language_code(language)
+
         return validated
-    
-    def filter_by_educational_criteria(
-        self,
-        items: List[Any],
-        grade_level: Optional[str] = None,
-        subject: Optional[str] = None,
-        min_relevance_score: Optional[float] = None
-    ) -> List[Any]:
+
+    def filter_by_educational_criteria(self, items: List[Any], grade_level: Optional[str] = None, subject: Optional[str] = None, min_relevance_score: Optional[float] = None) -> List[Any]:
         """
         Filter items by educational criteria.
-        
+
         Args:
             items: List of items to filter
             grade_level: Target grade level
             subject: Target subject
             min_relevance_score: Minimum educational relevance score
-            
+
         Returns:
             Filtered list of items
         """
         if not items:
             return items
-        
+
         filtered = items
-        
+
         # Filter by grade level
         if grade_level:
             try:
                 target_grade = Validator.validate_grade_level(grade_level)
-                filtered = [
-                    item for item in filtered
-                    if hasattr(item, 'is_suitable_for_grade_level') and 
-                    item.is_suitable_for_grade_level(target_grade)
-                ]
+                filtered = [item for item in filtered if hasattr(item, "is_suitable_for_grade_level") and item.is_suitable_for_grade_level(target_grade)]
             except ValidationError:
                 pass  # Skip filtering if grade level is invalid
-        
+
         # Filter by subject
         if subject:
-            filtered = [
-                item for item in filtered
-                if hasattr(item, 'has_subject') and item.has_subject(subject)
-            ]
-        
+            filtered = [item for item in filtered if hasattr(item, "has_subject") and item.has_subject(subject)]
+
         # Filter by relevance score
         if min_relevance_score is not None:
-            filtered = [
-                item for item in filtered
-                if hasattr(item, 'get_educational_score') and 
-                item.get_educational_score() >= min_relevance_score
-            ]
-        
+            filtered = [item for item in filtered if hasattr(item, "get_educational_score") and item.get_educational_score() >= min_relevance_score]
+
         return filtered
-    
-    def sort_by_educational_relevance(
-        self,
-        items: List[Any],
-        reverse: bool = True
-    ) -> List[Any]:
+
+    def sort_by_educational_relevance(self, items: List[Any], reverse: bool = True) -> List[Any]:
         """
         Sort items by educational relevance score.
-        
+
         Args:
             items: List of items to sort
             reverse: Sort in descending order (highest relevance first)
-            
+
         Returns:
             Sorted list of items
         """
         if not items:
             return items
-        
+
         def get_score(item):
-            if hasattr(item, 'get_educational_score'):
+            if hasattr(item, "get_educational_score"):
                 return item.get_educational_score()
-            elif hasattr(item, 'educational_metadata') and hasattr(item.educational_metadata, 'educational_relevance_score'):
+            elif hasattr(item, "educational_metadata") and hasattr(item.educational_metadata, "educational_relevance_score"):
                 return item.educational_metadata.educational_relevance_score
             else:
                 return 0.0
-        
+
         return sorted(items, key=get_score, reverse=reverse)
-    
+
     @abstractmethod
     async def health_check(self) -> Dict[str, Any]:
         """
         Perform a health check for this tool.
-        
+
         Returns:
             Dictionary with health status information
         """
         pass
-    
+
     async def get_tool_info(self) -> Dict[str, Any]:
         """
         Get information about this tool.
-        
+
         Returns:
             Dictionary with tool information
         """
@@ -355,8 +313,5 @@ class BaseTool(ABC):
             "name": self.tool_name,
             "api_name": self.api_name,
             "description": self.__doc__ or "No description available",
-            "methods": [
-                method for method in dir(self)
-                if not method.startswith('_') and callable(getattr(self, method))
-            ]
+            "methods": [method for method in dir(self) if not method.startswith("_") and callable(getattr(self, method))],
         }

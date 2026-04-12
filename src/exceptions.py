@@ -10,7 +10,7 @@ from typing import Optional
 
 class OpenEduMCPError(Exception):
     """Base exception for OpenEdu MCP Server."""
-    
+
     def __init__(self, message: str, details: Optional[str] = None):
         super().__init__(message)
         self.message = message
@@ -24,7 +24,7 @@ class OpenEduMCPError(Exception):
 
 class ToolError(OpenEduMCPError):
     """Error in tool execution."""
-    
+
     def __init__(self, message: str, tool_name: str, details: Optional[str] = None):
         super().__init__(message, details)
         self.tool_name = tool_name
@@ -32,14 +32,8 @@ class ToolError(OpenEduMCPError):
 
 class APIError(OpenEduMCPError):
     """Error in external API communication."""
-    
-    def __init__(
-        self, 
-        message: str, 
-        api_name: str, 
-        status_code: Optional[int] = None,
-        details: Optional[str] = None
-    ):
+
+    def __init__(self, message: str, api_name: str, status_code: Optional[int] = None, details: Optional[str] = None):
         super().__init__(message, details)
         self.api_name = api_name
         self.status_code = status_code
@@ -55,7 +49,7 @@ class APIError(OpenEduMCPError):
 
 class CacheError(OpenEduMCPError):
     """Error in cache operations."""
-    
+
     def __init__(self, message: str, operation: Optional[str] = None, details: Optional[str] = None):
         super().__init__(message, details)
         self.operation = operation
@@ -71,14 +65,8 @@ class CacheError(OpenEduMCPError):
 
 class RateLimitError(OpenEduMCPError):
     """Rate limit exceeded."""
-    
-    def __init__(
-        self, 
-        message: str, 
-        api_name: str,
-        retry_after: Optional[int] = None,
-        details: Optional[str] = None
-    ):
+
+    def __init__(self, message: str, api_name: str, retry_after: Optional[int] = None, details: Optional[str] = None):
         super().__init__(message, details)
         self.api_name = api_name
         self.retry_after = retry_after
@@ -94,7 +82,7 @@ class RateLimitError(OpenEduMCPError):
 
 class ValidationError(OpenEduMCPError):
     """Input validation error."""
-    
+
     def __init__(self, message: str, field: Optional[str] = None, details: Optional[str] = None):
         super().__init__(message, details)
         self.field = field
@@ -110,7 +98,7 @@ class ValidationError(OpenEduMCPError):
 
 class ConfigurationError(OpenEduMCPError):
     """Configuration error."""
-    
+
     def __init__(self, message: str, config_key: Optional[str] = None, details: Optional[str] = None):
         super().__init__(message, details)
         self.config_key = config_key
@@ -126,7 +114,7 @@ class ConfigurationError(OpenEduMCPError):
 
 class DatabaseError(OpenEduMCPError):
     """Database operation error."""
-    
+
     def __init__(self, message: str, operation: Optional[str] = None, details: Optional[str] = None):
         super().__init__(message, details)
         self.operation = operation
@@ -142,7 +130,7 @@ class DatabaseError(OpenEduMCPError):
 
 class NetworkError(OpenEduMCPError):
     """Network communication error."""
-    
+
     def __init__(self, message: str, url: Optional[str] = None, details: Optional[str] = None):
         super().__init__(message, details)
         self.url = url

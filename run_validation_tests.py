@@ -19,42 +19,23 @@ from test_real_world_validation import RealWorldValidator
 
 def parse_arguments():
     """Parse command line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Run real-world validation tests for OpenEdu MCP Server APIs"
-    )
-    
-    parser.add_argument(
-        "--api",
-        choices=["arxiv", "wikipedia", "dictionary", "openlibrary", "all"],
-        default="all",
-        help="Specific API to test (default: all)"
-    )
-    
-    parser.add_argument(
-        "--output",
-        type=str,
-        help="Output file for detailed report (default: auto-generated)"
-    )
-    
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="Enable verbose output"
-    )
-    
-    parser.add_argument(
-        "--quick",
-        action="store_true",
-        help="Run quick tests only (skip performance and integration tests)"
-    )
-    
+    parser = argparse.ArgumentParser(description="Run real-world validation tests for OpenEdu MCP Server APIs")
+
+    parser.add_argument("--api", choices=["arxiv", "wikipedia", "dictionary", "openlibrary", "all"], default="all", help="Specific API to test (default: all)")
+
+    parser.add_argument("--output", type=str, help="Output file for detailed report (default: auto-generated)")
+
+    parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
+
+    parser.add_argument("--quick", action="store_true", help="Run quick tests only (skip performance and integration tests)")
+
     return parser.parse_args()
 
 
 async def run_specific_api_tests(validator: RealWorldValidator, api: str):
     """Run tests for a specific API."""
     print(f"🎯 Running tests for {api.upper()} API only")
-    
+
     # Map API names to test methods
     api_tests = {
         "arxiv": [
@@ -89,17 +70,17 @@ async def run_specific_api_tests(validator: RealWorldValidator, api: str):
             ("OpenLibrary Educational Features", "openlibrary", validator.test_openlibrary_educational_features),
             ("OpenLibrary Book Recommendations", "openlibrary", validator.test_openlibrary_book_recommendations),
             ("OpenLibrary Health Check", "openlibrary", validator.test_openlibrary_health_check),
-        ]
+        ],
     }
-    
+
     await validator.initialize_services()
-    
+
     # Run tests for the specific API
     tests = api_tests.get(api, [])
     for test_name, api_service, test_func in tests:
         await validator.run_test(test_name, api_service, test_func)
         await asyncio.sleep(0.5)  # Rate limiting
-    
+
     await validator.cleanup_services()
     return validator.generate_report()
 
@@ -107,7 +88,7 @@ async def run_specific_api_tests(validator: RealWorldValidator, api: str):
 async def run_quick_tests(validator: RealWorldValidator):
     """Run quick validation tests (health checks and basic functionality)."""
     print("⚡ Running quick validation tests")
-    
+
     quick_tests = [
         ("ArXiv Health Check", "arxiv", validator.test_arxiv_health_check),
         ("ArXiv Basic Search", "arxiv", validator.test_arxiv_basic_search),
@@ -118,13 +99,13 @@ async def run_quick_tests(validator: RealWorldValidator):
         ("OpenLibrary Health Check", "openlibrary", validator.test_openlibrary_health_check),
         ("OpenLibrary Book Search", "openlibrary", validator.test_openlibrary_book_search),
     ]
-    
+
     await validator.initialize_services()
-    
+
     for test_name, api_service, test_func in quick_tests:
         await validator.run_test(test_name, api_service, test_func)
         await asyncio.sleep(0.3)  # Shorter delay for quick tests
-    
+
     await validator.cleanup_services()
     return validator.generate_report()
 
@@ -132,12 +113,12 @@ async def run_quick_tests(validator: RealWorldValidator):
 async def main():
     """Main execution function."""
     args = parse_arguments()
-    
+
     print("🔬 OpenEdu MCP Server - Real-World API Validation")
     print("=" * 60)
-    
+
     validator = RealWorldValidator()
-    
+
     try:
         # Run appropriate tests based on arguments
         if args.quick:
@@ -146,49 +127,51 @@ async def main():
             report = await run_specific_api_tests(validator, args.api)
         else:
             report = await validator.run_all_tests()
-        
+
         # Print summary
         print("\n" + "=" * 60)
         print("📊 VALIDATION SUMMARY")
         print("=" * 60)
-        
+
         success_rate = (report.passed_tests / report.total_tests) * 100 if report.total_tests > 0 else 0
-        
+
         print(f"🕒 Duration: {report.total_duration_seconds:.2f}s")
         print(f"📋 Tests: {report.total_tests}")
         print(f"✅ Passed: {report.passed_tests}")
         print(f"❌ Failed: {report.failed_tests}")
         print(f"📈 Success Rate: {success_rate:.1f}%")
-        
+
         # API Health Summary
         if report.api_health_status:
             print(f"\n🏥 API Health:")
             for api, status in report.api_health_status.items():
                 icon = "✅" if status == "PASS" else "❌"
                 print(f"  {icon} {api.upper()}")
-        
+
         # Educational Features Summary
         edu_features = report.educational_features_validation
         if edu_features:
             print(f"\n🎓 Educational Features:")
             print(f"  📚 Metadata Tests: {edu_features.get('educational_metadata_present', 0)}")
-            workflow_status = "✅" if edu_features.get('cross_api_workflow_success', False) else "❌"
+            workflow_status = "✅" if edu_features.get("cross_api_workflow_success", False) else "❌"
             print(f"  🔗 Cross-API Workflow: {workflow_status}")
-        
+
         # Save report
         if args.output:
             report_file = args.output
         else:
             from datetime import datetime
+
             report_file = f"validation_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        
+
         import json
         from dataclasses import asdict
-        with open(report_file, 'w') as f:
+
+        with open(report_file, "w") as f:
             json.dump(asdict(report), f, indent=2, default=str)
-        
+
         print(f"\n📄 Report: {report_file}")
-        
+
         # Exit with appropriate code
         if report.failed_tests > 0:
             print(f"\n⚠️ {report.failed_tests} test(s) failed")
@@ -201,7 +184,7 @@ async def main():
         else:
             print(f"\n🎉 All tests passed!")
             return True
-            
+
     except KeyboardInterrupt:
         print(f"\n⏹️ Tests interrupted by user")
         return False
@@ -209,6 +192,7 @@ async def main():
         print(f"\n❌ Validation failed: {e}")
         if args.verbose:
             import traceback
+
             traceback.print_exc()
         return False
 

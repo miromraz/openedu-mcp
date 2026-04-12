@@ -23,10 +23,11 @@ except NameError:
     async def anext_fallback(aiter):
         """
         Advances an asynchronous iterator and returns the next item.
-        
+
         Equivalent to the built-in `anext` function introduced in Python 3.10.
         """
         return await aiter.__anext__()
+
     anext = anext_fallback
 
 from main import (
@@ -35,7 +36,7 @@ from main import (
     cleanup_services,
     handle_stdio_input,
     # stream_events, # This is a tool, but also an HTTP endpoint. How it's called matters.
-    OpenEduMCPError # Assuming this is the correct exception
+    OpenEduMCPError,  # Assuming this is the correct exception
 )
 # If stream_events is directly callable as a tool for some reason, import it.
 # Otherwise, it will be tested via HTTP.
@@ -50,6 +51,7 @@ if hasattr(mcp, "server") and mcp.server:
 # MockContext from existing integration tests
 class MockContext:
     """Mock context for testing MCP tools."""
+
     def __init__(self, session_id: str = "test_session"):
         self.session_id = session_id
         # Add any other fields that tools might expect from the context
@@ -63,6 +65,7 @@ def event_loop():
     loop = asyncio.get_event_loop_policy().new_event_loop()
     yield loop
     loop.close()
+
 
 @pytest.fixture(scope="module")
 async def initialized_services() -> AsyncGenerator[None, None]:
@@ -104,7 +107,8 @@ class TestStdioEndpoint:
 # For now, we assume a base_url and that httpx can connect if the server is run separately,
 # OR if ASGI_APP is successfully found.
 
-BASE_URL = "http://127.0.0.1:8000" # Default for Uvicorn if not configured otherwise in FastMCP
+BASE_URL = "http://127.0.0.1:8000"  # Default for Uvicorn if not configured otherwise in FastMCP
+
 
 class TestHttpViaToolEndpoint:
     @pytest.mark.asyncio
@@ -120,7 +124,7 @@ class TestHttpViaToolEndpoint:
             # The URL and request format are assumptions about FastMCP's JSON RPC implementation
             # Option 1: JSON RPC style
             response = await client.post(
-                "/mcp", # Assuming a single RPC endpoint
+                "/mcp",  # Assuming a single RPC endpoint
                 json={
                     "jsonrpc": "2.0",
                     "method": "handle_stdio_input",
@@ -138,13 +142,12 @@ class TestHttpViaToolEndpoint:
             data = response.json()
 
             # Depending on JSON RPC spec, result might be under "result" or "data"
-            if "result" in data: # Standard JSON RPC
+            if "result" in data:  # Standard JSON RPC
                 assert data["result"] == "Processed: HTTP TEST"
-            elif "data" in data: # Other conventions
-                 assert data["data"] == "Processed: HTTP TEST"
-            else: # Or if it's a direct result not wrapped in JSON RPC success
-                 assert data == "Processed: HTTP TEST"
-
+            elif "data" in data:  # Other conventions
+                assert data["data"] == "Processed: HTTP TEST"
+            else:  # Or if it's a direct result not wrapped in JSON RPC success
+                assert data == "Processed: HTTP TEST"
 
     @pytest.mark.asyncio
     async def test_http_call_stdio_tool_empty_param_directly(self, initialized_services: None):
@@ -157,13 +160,13 @@ class TestHttpViaToolEndpoint:
                 json={
                     "jsonrpc": "2.0",
                     "method": "handle_stdio_input",
-                    "params": {"input_string": ""}, # Empty string
+                    "params": {"input_string": ""},  # Empty string
                     "id": 2,
                 },
             )
             # Expecting an error, but not a connection error.
             # The error should be from the tool's validation logic.
-            assert response.status_code == 200 # JSON-RPC usually returns 200 for application errors
+            assert response.status_code == 200  # JSON-RPC usually returns 200 for application errors
             data = response.json()
             assert "error" in data
             assert data["error"]["message"] == "Input string cannot be empty"
@@ -177,7 +180,7 @@ class TestSseEndpoint:
     async def test_sse_stream_connect_and_ping_directly(self, initialized_services: None):
         """
         Tests that the SSE endpoint at /events streams 'connected' and 'ping' events as expected.
-        
+
         Connects to the Server-Sent Events endpoint, verifies the response status and content type,
         and asserts that both a 'connected' event with a success message and a 'ping' event with a
         heartbeat message are received in the correct format. Skips the test if the ASGI app is not available.
@@ -191,7 +194,7 @@ class TestSseEndpoint:
                 assert response.headers["content-type"] == "text/event-stream"
 
                 events_received = 0
-                expected_events = 2 # Connect + 1 ping
+                expected_events = 2  # Connect + 1 ping
 
                 stream_ended_prematurely = True
                 async for line in response.aiter_lines():
@@ -202,7 +205,7 @@ class TestSseEndpoint:
                         data_line = await anext(response.aiter_lines())
                         # print(f"SSE Connected Data: {data_line}") # For debugging
                         assert data_line.startswith("data: ")
-                        payload = json.loads(data_line[len("data: "):])
+                        payload = json.loads(data_line[len("data: ") :])
                         assert payload["message"] == "Successfully connected to SSE stream"
 
                     elif line.startswith("event: ping"):
@@ -211,7 +214,7 @@ class TestSseEndpoint:
                         data_line = await anext(response.aiter_lines())
                         # print(f"SSE Ping Data: {data_line}") # For debugging
                         assert data_line.startswith("data: ")
-                        payload = json.loads(data_line[len("data: "):])
+                        payload = json.loads(data_line[len("data: ") :])
                         assert "heartbeat" in payload
                         assert payload["message"] == "ping"
 
@@ -230,6 +233,7 @@ class TestSseEndpoint:
     # TODO: Add a test for SSE that handles client disconnection if possible,
     # but this is hard to simulate reliably with httpx without more control
     # over the exact timing of request cancellation.
+
 
 if __name__ == "__main__":
     # This allows running the tests directly with `python tests/test_new_endpoints.py`

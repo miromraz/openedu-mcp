@@ -7,4 +7,4 @@ data sources including Open Library, Wikipedia, Dictionary API, and arXiv.
 
 from .openlibrary import OpenLibraryClient
 
-__all__ = ['OpenLibraryClient']
+__all__ = ["OpenLibraryClient"]

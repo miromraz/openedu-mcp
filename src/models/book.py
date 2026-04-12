@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional, List
 
 import sys
 from pathlib import Path
+
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from models.base import BaseModel, EducationalMetadata, GradeLevel, CurriculumStandard
@@ -19,10 +20,11 @@ from models.base import BaseModel, EducationalMetadata, GradeLevel, CurriculumSt
 @dataclass
 class Book(BaseModel):
     """Model representing an educational book."""
+
     # Required fields first
     id: str = ""
     title: str = ""
-    
+
     # Optional fields with defaults
     authors: List[str] = field(default_factory=list)
     isbn: Optional[str] = None
@@ -34,15 +36,15 @@ class Book(BaseModel):
     cover_url: Optional[str] = None
     page_count: Optional[int] = None
     language: str = "en"
-    
+
     # Educational metadata
     educational_metadata: EducationalMetadata = field(default_factory=EducationalMetadata)
     lexile_score: Optional[int] = None
-    
+
     # Source information
     source: str = "open_library"
     source_url: Optional[str] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for serialization."""
         return {
@@ -63,16 +65,14 @@ class Book(BaseModel):
             "source": self.source,
             "source_url": self.source_url,
             "created_at": self.created_at.isoformat(),
-            "updated_at": self.updated_at.isoformat()
+            "updated_at": self.updated_at.isoformat(),
         }
-    
+
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'Book':
+    def from_dict(cls, data: Dict[str, Any]) -> "Book":
         """Create from dictionary."""
-        educational_metadata = EducationalMetadata.from_dict(
-            data.get("educational_metadata", {})
-        )
-        
+        educational_metadata = EducationalMetadata.from_dict(data.get("educational_metadata", {}))
+
         return cls(
             id=data["id"],
             title=data["title"],
@@ -91,23 +91,23 @@ class Book(BaseModel):
             source=data.get("source", "open_library"),
             source_url=data.get("source_url"),
             created_at=datetime.fromisoformat(data.get("created_at", datetime.now().isoformat())),
-            updated_at=datetime.fromisoformat(data.get("updated_at", datetime.now().isoformat()))
+            updated_at=datetime.fromisoformat(data.get("updated_at", datetime.now().isoformat())),
         )
-    
+
     @classmethod
-    def from_open_library(cls, ol_data: Dict[str, Any]) -> 'Book':
+    def from_open_library(cls, ol_data: Dict[str, Any]) -> "Book":
         """Create Book from Open Library API response."""
         # Extract basic information
         work_id = ol_data.get("key", "").replace("/works/", "")
         title = ol_data.get("title", "")
         authors = []
-        
+
         # Extract authors
         if "author_name" in ol_data:
             authors = ol_data["author_name"]
         elif "authors" in ol_data:
             authors = [author.get("name", "") for author in ol_data["authors"]]
-        
+
         # Extract publication info
         publication_date = None
         if "first_publish_year" in ol_data:
@@ -115,7 +115,7 @@ class Book(BaseModel):
                 publication_date = date(ol_data["first_publish_year"], 1, 1)
             except (ValueError, TypeError):
                 pass
-        
+
         # Extract ISBNs
         isbn = None
         isbn13 = None
@@ -125,15 +125,15 @@ class Book(BaseModel):
                     isbn = isbn_val
                 elif len(isbn_val) == 13:
                     isbn13 = isbn_val
-        
+
         # Extract subjects
         subjects = ol_data.get("subject", [])
         if isinstance(subjects, str):
             subjects = [subjects]
-        
+
         # Create educational metadata
         educational_metadata = EducationalMetadata()
-        
+
         # Try to infer grade levels from subjects
         for subject in subjects:
             subject_lower = subject.lower()
@@ -145,10 +145,10 @@ class Book(BaseModel):
                 educational_metadata.grade_levels.append(GradeLevel.GRADES_9_12)
             elif any(term in subject_lower for term in ["college", "university"]):
                 educational_metadata.grade_levels.append(GradeLevel.COLLEGE)
-        
+
         # Set educational subjects
         educational_metadata.educational_subjects = subjects[:5]  # Limit to first 5
-        
+
         return cls(
             id=work_id,
             title=title,
@@ -159,30 +159,27 @@ class Book(BaseModel):
             publisher=ol_data.get("publisher", [None])[0] if ol_data.get("publisher") else None,
             subjects=subjects,
             description=ol_data.get("description", ""),
-            cover_url=f"https://covers.openlibrary.org/b/id/{ol_data.get('cover_i', '')}-L.jpg" if ol_data.get('cover_i') else None,
+            cover_url=f"https://covers.openlibrary.org/b/id/{ol_data.get('cover_i', '')}-L.jpg" if ol_data.get("cover_i") else None,
             page_count=ol_data.get("number_of_pages_median"),
             language=ol_data.get("language", ["en"])[0] if ol_data.get("language") else "en",
             educational_metadata=educational_metadata,
             source="open_library",
-            source_url=f"https://openlibrary.org/works/{work_id}"
+            source_url=f"https://openlibrary.org/works/{work_id}",
         )
-    
+
     def is_suitable_for_grade_level(self, grade_level: GradeLevel) -> bool:
         """Check if book is suitable for a specific grade level."""
         return grade_level in self.educational_metadata.grade_levels
-    
+
     def has_subject(self, subject: str) -> bool:
         """Check if book covers a specific subject."""
         subject_lower = subject.lower()
-        return any(
-            subject_lower in s.lower() 
-            for s in (self.subjects + self.educational_metadata.educational_subjects)
-        )
-    
+        return any(subject_lower in s.lower() for s in (self.subjects + self.educational_metadata.educational_subjects))
+
     def get_educational_score(self) -> float:
         """Calculate educational relevance score."""
         score = self.educational_metadata.educational_relevance_score
-        
+
         # Boost score based on educational indicators
         if self.educational_metadata.grade_levels:
             score += 0.2
@@ -192,5 +189,5 @@ class Book(BaseModel):
             score += 0.1
         if self.lexile_score:
             score += 0.1
-        
+
         return min(score, 1.0)  # Cap at 1.0
