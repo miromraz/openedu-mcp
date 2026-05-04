@@ -230,9 +230,31 @@ class TestSseEndpoint:
                 assert not stream_ended_prematurely, f"Stream ended before receiving {expected_events} events."
                 assert events_received >= expected_events
 
-    # TODO: Add a test for SSE that handles client disconnection if possible,
-    # but this is hard to simulate reliably with httpx without more control
-    # over the exact timing of request cancellation.
+    @pytest.mark.asyncio
+    async def test_sse_stream_handles_client_disconnect(self, initialized_services: None):
+        """
+        Verifies the server cleanly handles a client closing the SSE stream mid-flight
+        and continues to serve subsequent connections.
+        """
+        if not ASGI_APP:
+            pytest.skip("ASGI app not found on MCP instance, skipping SSE disconnect test.")
+
+        async with httpx.AsyncClient(app=ASGI_APP, base_url="http://testserver") as client:
+            async with client.stream("GET", "/events") as response:
+                assert response.status_code == 200
+                async for line in response.aiter_lines():
+                    if line.startswith("event: connected"):
+                        break  # disconnect mid-stream
+
+            # Server must still serve fresh connections after the abrupt close.
+            async with client.stream("GET", "/events") as response:
+                assert response.status_code == 200
+                got_connected = False
+                async for line in response.aiter_lines():
+                    if line.startswith("event: connected"):
+                        got_connected = True
+                        break
+                assert got_connected, "Server did not emit 'connected' on follow-up stream after client disconnect."
 
 
 if __name__ == "__main__":
