@@ -1,5 +1,7 @@
 # OpenEdu MCP Server
 
+> **cotg integration note:** This directory is a vendored MCP project used by `server/mcp_client.py`. In normal cotg development you do not clone it separately; the backend launches it as a subprocess from this checked-in copy. The remainder of this README is mostly upstream project documentation.
+
 A comprehensive Model Context Protocol (MCP) server designed to provide educational resources and support curriculum planning for educators. This server integrates with multiple educational APIs to provide access to books, articles, definitions, and research papers with intelligent educational filtering and grade-level appropriateness.
 
 ## 🎓 Features
@@ -31,7 +33,7 @@ A comprehensive Model Context Protocol (MCP) server designed to provide educatio
 
 ### Installation
 
-1. **Clone the repository:**
+1. **Use the vendored copy in this repository (already present under `server/openedu-mcp/`) or clone the upstream repository if you are working on OpenEdu itself:**
 ```bash
 git clone https://github.com/Cicatriiz/openedu-mcp.git
 cd openedu-mcp
